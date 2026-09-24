@@ -12,6 +12,9 @@ try { const saved = JSON.parse(localStorage.getItem('api_query_history') || '[]'
 let currentResponseData = null;
 let viewMode = 'visual'; // 'visual' | 'raw'
 
+// API Status Tracker
+const apiStatus = {}; // item.id -> 'online' | 'offline' | 'checking'
+
 // Key Label Translator Dictionary
 const FIELD_LABELS = {
   cpf: 'CPF',
@@ -103,6 +106,39 @@ function init() {
   if (ENDPOINTS.length > 0) {
     selectEndpoint(ENDPOINTS[0]);
   }
+
+  // Iniciar teste automático das APIs
+  checkAllApisStatus();
+}
+
+async function checkAllApisStatus() {
+  for (const endpoint of ENDPOINTS) {
+    apiStatus[endpoint.id] = 'checking';
+    // Atualiza apenas a bolinha no card correspondente, se visível
+    updateCardStatusVisual(endpoint.id);
+    
+    try {
+      const proxyUrl = `/api-proxy/${endpoint.endpoint}`;
+      // Faz um request rápido (HEAD) apenas para ver se o proxy e o destino respondem
+      const res = await fetch(proxyUrl, { method: 'HEAD', signal: AbortSignal.timeout(10000) });
+      // Se respondeu, consideramos online (mesmo que retorne erro de falta de parâmetro)
+      apiStatus[endpoint.id] = (res.status >= 200 && res.status < 500) ? 'online' : 'offline';
+    } catch (err) {
+      apiStatus[endpoint.id] = 'offline';
+    }
+    updateCardStatusVisual(endpoint.id);
+  }
+}
+
+function updateCardStatusVisual(id) {
+  const card = document.querySelector(`.api-card[data-id="${id}"]`);
+  if (!card) return;
+  
+  const status = apiStatus[id];
+  card.classList.remove('status-online', 'status-offline', 'status-checking');
+  if (status) {
+    card.classList.add(`status-${status}`);
+  }
 }
 
 // Render Sidebar Navigation
@@ -150,16 +186,25 @@ function renderEndpoints() {
     return;
   }
 
-  endpointsGridEl.innerHTML = filtered.map(item => `
-    <button type="button" aria-pressed="${selectedEndpoint?.id === item.id}" class="api-card ${selectedEndpoint?.id === item.id ? 'selected' : ''}" data-id="${item.id}">
-      <div class="api-card-topline"><span class="api-symbol">${CATEGORY_ICONS[item.category]}</span><span class="api-selection">${selectedEndpoint?.id === item.id ? '✓ Selecionada' : 'Selecionar ↗'}</span></div>
+  endpointsGridEl.innerHTML = filtered.map(item => {
+    const statusClass = apiStatus[item.id] ? `status-${apiStatus[item.id]}` : '';
+    const statusDot = `<div class="status-indicator"></div>`;
+    return `
+    <button type="button" aria-pressed="${selectedEndpoint?.id === item.id}" class="api-card ${selectedEndpoint?.id === item.id ? 'selected' : ''} ${statusClass}" data-id="${item.id}">
+      <div class="api-card-topline">
+        <div style="display:flex;align-items:center;gap:6px;">
+          ${statusDot}
+          <span class="api-symbol">${CATEGORY_ICONS[item.category]}</span>
+        </div>
+        <span class="api-selection">${selectedEndpoint?.id === item.id ? '✓ Selecionada' : 'Selecionar ↗'}</span>
+      </div>
       <div class="api-card-header">
         <span class="api-card-title">${item.name}</span>
         <span class="badge">${item.badge}</span>
       </div>
       <p class="api-card-desc">${item.description}</p>
     </button>
-  `).join('');
+  `}).join('');
 }
 
 // Select Endpoint and Setup Form
