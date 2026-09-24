@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel de Consulta Cadastral</title>
+  <meta name="description" content="Visualizador de dados de consulta cadastral com formatação profissional.">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>{}</text></svg>">
+  <link rel="stylesheet" href="/src/consulta.css">
+</head>
+<body>
+
+<div id="app">
+  <nav class="top-nav">
+    <div class="container nav-inner">
+      <div class="nav-brand">
+        <span class="nav-icon">{}</span>
+        <div>
+          <h1>Painel de Consulta Cadastral</h1>
+          <span class="nav-sub">Dados organizados, leitura simplificada</span>
+        </div>
+      </div>
+      <button type="button" class="btn-icon" id="logoutButton">Sair</button><a href="/" class="nav-back">← Voltar ao Painel de APIs</a>
+    </div>
+  </nav>
+
+  <main class="container">
+    <p id="stateAnnouncement" class="sr-only" role="status" aria-live="polite"></p>
+    <!-- Input Section -->
+    <section class="input-section" id="inputSection">
+      <button class="input-toggle" id="inputToggle" type="button" aria-expanded="true" aria-controls="inputBody">
+        <span>Carregar resposta</span>
+        <span class="chevron" id="chevron">▾</span>
+      </button>
+      <div class="input-body" id="inputBody">
+        <label for="jsonInput" class="sr-only">Cole o retorno JSON da API</label>
+        <textarea id="jsonInput" rows="5" placeholder="Cole aqui o retorno JSON da API de consulta cadastral…" spellcheck="false" autocomplete="off"></textarea>
+        <div class="input-actions">
+          <button id="btnVisualize" class="btn btn-primary" type="button">Visualizar consulta</button>
+          <button id="btnClear" class="btn btn-outline" type="button">Limpar</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Empty State -->
+    <section id="stateEmpty" class="state-card">
+      <div class="state-icon">{}</div>
+      <h2>Nenhuma consulta carregada</h2>
+      <p>Cole o retorno JSON no campo acima para visualizar os dados formatados.</p>
+    </section>
+
+    <!-- Processing State -->
+    <section id="stateProcessing" class="state-card hidden">
+      <div class="spinner-ring" role="status" aria-label="Processando"></div>
+      <h2>Processando dados…</h2>
+    </section>
+
+    <!-- Error State -->
+    <section role="alert" id="stateError" class="state-card hidden">
+      <div class="state-icon">⚠️</div>
+      <h2 id="errorTitle">Erro ao processar</h2>
+      <p id="errorMessage"></p>
+    </section>
+
+    <!-- Dashboard -->
+    <section id="dashboard" class="hidden">
+      <div id="consultationHeader" class="card header-card"></div>
+      <div id="summaryCards" class="summary-grid"></div>
+      <div class="card tabs-card">
+        <nav class="tabs-nav" role="tablist" id="tabsNav" aria-label="Seções da consulta">
+          <button class="tab-btn active" role="tab" data-tab="personal" aria-selected="true" id="tab-personal" aria-controls="panel-personal" tabindex="0">Dados pessoais</button>
+          <button class="tab-btn" role="tab" data-tab="contacts" aria-selected="false" id="tab-contacts" aria-controls="panel-contacts" tabindex="-1">Contatos</button>
+          <button class="tab-btn" role="tab" data-tab="addresses" aria-selected="false" id="tab-addresses" aria-controls="panel-addresses" tabindex="-1">Endereços</button>
+          <button class="tab-btn" role="tab" data-tab="financial" aria-selected="false" id="tab-financial" aria-controls="panel-financial" tabindex="-1">Financeiro</button>
+          <button class="tab-btn" role="tab" data-tab="technical" aria-selected="false" id="tab-technical" aria-controls="panel-technical" tabindex="-1">Dados técnicos</button>
+        </nav>
+        <div class="tab-panels">
+          <div class="tab-panel active" role="tabpanel" id="panel-personal" aria-labelledby="tab-personal"></div>
+          <div class="tab-panel" role="tabpanel" id="panel-contacts" aria-labelledby="tab-contacts"></div>
+          <div class="tab-panel" role="tabpanel" id="panel-addresses" aria-labelledby="tab-addresses"></div>
+          <div class="tab-panel" role="tabpanel" id="panel-financial" aria-labelledby="tab-financial"></div>
+          <div class="tab-panel" role="tabpanel" id="panel-technical" aria-labelledby="tab-technical"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">Painel de Consulta Cadastral — Informações da fonte · Dados não armazenados por este visualizador</div>
+  </footer>
+</div>
+
+<script type="module" src="/src/consulta.js"></script>
+<script type="module" src="/src/logout.js"></script>
+</body>
+</html>
+

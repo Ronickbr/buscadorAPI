@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Me Encontre - Painel de Consultas</title>
+  <meta name="description" content="Sistema Web Avançado para Consulta de Me Encontre com suporte a busca multi-banco e visualização em tempo real.">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+<a class="skip-link" href="#workspace">Ir para as consultas</a>
+
+  <div class="app-container">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="brand-header">
+        <div class="brand-logo"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
+        <div class="brand-info">
+          <h1>Me Encontre</h1>
+          <span>Workspace de consultas</span>
+        </div>
+      </div>
+
+      <div class="nav-label">Categorias</div>
+      <ul class="nav-menu" id="categoryNav">
+        <!-- Rendered dynamically by main.js -->
+      </ul>
+
+      <div class="sidebar-footer"><a href="/consulta.html">Visualizar JSON <span aria-hidden="true">↗</span></a>
+        <div class="status-card">
+          <div class="pulse-dot"></div>
+          <div>
+            <strong style="color: #fff; display: block; font-size: 11px;">Conexão via proxy</strong>
+            <span style="color: var(--text-muted); font-size: 10px;">Verificada ao consultar</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Workspace -->
+    <main class="main-content">
+      <!-- Topbar -->
+      <header class="topbar">
+        <div class="search-box">
+          <span class="search-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg></span>
+          <input type="text" id="globalSearch" aria-label="Buscar APIs" placeholder="Buscar por nome, CPF, placa..." autocomplete="off">
+        </div>
+
+        <div class="topbar-actions"><button type="button" class="btn-icon" id="logoutButton">Sair</button>
+          <button class="btn-icon" id="btnToggleHistory">
+            Histórico (<span id="historyCount">0</span>)
+          </button>
+          <a class="btn-icon" href="https://t.me/astrahvhdev" target="_blank" rel="noopener" style="color: var(--primary-hover);">
+            Suporte ↗
+          </a>
+        </div>
+      </header>
+
+      <!-- Content Area (Split: Grid + Executor vs Response Panel) -->
+      <div class="page-intro"><div><h2>Central de consultas</h2><p>Encontre a informação certa. Tudo em um só lugar.</p></div><span class="workspace-label">Central de consultas</span></div>
+<div class="content-area" id="workspace">
+        <div class="workspace">
+          
+          <!-- Category Title & Endpoints Grid -->
+          <div class="section-header">
+            <h2 class="section-title" id="currentCategoryTitle">
+              Explore as APIs
+            </h2>
+            <span style="font-size: 12px; color: var(--text-muted);" id="apiCountBadge">20 APIs disponíveis</span>
+          </div>
+
+          <!-- Cards Grid -->
+          <div class="endpoints-grid" id="endpointsGrid">
+            <!-- Rendered dynamically -->
+          </div>
+
+          <!-- Query Executor Form -->
+          <div class="executor-card" id="executorCard">
+            <div class="executor-header">
+              <div>
+                <div class="panel-step"><span>2</span> Configure sua consulta</div><h3 style="font-size: 18px; font-weight: 700; color: #fff;" id="selectedApiName">Selecione uma API</h3>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;" id="selectedApiDesc">Escolha um dos cards acima para montar a sua consulta.</p>
+              </div>
+            </div>
+
+            <!-- Dynamic Form Inputs -->
+            <form id="queryForm" class="query-form" onsubmit="return false;">
+              <!-- Inputs rendered dynamically based on selected API -->
+            </form>
+
+            <!-- Pre-fill Examples Bar -->
+            <div class="examples-bar" id="examplesBar">
+              <span class="examples-label">Exemplos Rápidos:</span>
+              <div id="examplesContainer" style="display: flex; gap: 6px; flex-wrap: wrap;">
+                <!-- Sample buttons rendered dynamically -->
+              </div>
+            </div>
+
+            <!-- Action Submit Bar -->
+            <div class="action-bar">
+              <button class="btn-submit" id="btnExecuteQuery" disabled>
+                Consultar agora →
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right Side: Response Viewer Panel -->
+        <section class="response-panel" aria-label="Resultado da consulta">
+          <div class="response-header">
+            <div class="response-status">
+              <span>Resultado da consulta</span>
+              <span class="status-badge idle" id="responseStatusBadge" role="status">Aguardando</span>
+              <span style="font-size: 11px; color: var(--text-dim);" id="responseTimeBadge"></span>
+            </div>
+
+            <div class="response-actions">
+              <div class="view-mode-toggle" role="group" aria-label="Formato do resultado">
+                <button class="btn-tool active" id="btnViewVisual" style="padding: 4px 8px; font-size: 11px;">Visual</button>
+                <button class="btn-tool" id="btnViewRaw" style="padding: 4px 8px; font-size: 11px;">JSON</button>
+              </div>
+              <button class="btn-tool" id="btnCopyJson" title="Copiar resposta">
+                Copiar
+              </button>
+              <button class="btn-tool" id="btnDownloadJson" title="Baixar resultado em texto (.txt)">
+                Baixar texto
+              </button>
+            </div>
+          </div>
+
+          <div class="response-body" id="responseBody">
+            <div class="empty-response">
+              <span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H5v20h14V7Z M14 2v5h5 M8 11h8 M8 15h5 M8 18h3"/></svg></span>
+              <strong style="color: var(--text-muted);">Seu resultado aparece aqui</strong>
+              <span style="font-size: 12px; max-width: 280px;">Selecione uma API e inicie uma consulta. Os dados serão organizados aqui para facilitar sua leitura.</span>
+            </div>
+          </div>
+          <div class="response-footer">Visualização organizada · Exportação em texto (.txt)</div>
+        </section>
+      </div>
+    </main>
+
+    <!-- History Drawer -->
+    <div class="history-drawer" id="historyDrawer">
+      <div class="drawer-header">
+        <h3 class="drawer-title">Histórico de consultas</h3>
+        <button class="btn-tool" id="btnCloseHistory">✕ Fechar</button>
+      </div>
+
+      <div class="history-list" id="historyList">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <button class="btn-tool" id="btnClearHistory" style="margin-top: 12px; width: 100%; justify-content: center; color: var(--primary);">
+        Limpar histórico
+      </button>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div class="toast-container" id="toastContainer" role="status" aria-live="polite"></div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+<script type="module" src="/src/logout.js"></script>
+</body>
+</html>

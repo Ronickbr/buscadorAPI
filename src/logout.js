@@ -1,0 +1,1 @@
+document.getElementById('logoutButton')?.addEventListener('click',async function(){this.disabled=true;try{const response=await fetch('/auth/logout',{method:'POST'});if(!response.ok)throw Error();location.replace('/login');}catch{this.disabled=false;this.textContent='Tentar sair novamente';}});

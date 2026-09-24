@@ -1,0 +1,27 @@
+import {missing,text,money,date,document as formatDocument} from './cadastral-format.js';
+const escape=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const names={dados:'Dados pessoais',telefone:'Telefones',telefones:'Telefones',email:'E-mails',emails:'E-mails',enderecos:'Endereços',score:'Score da fonte',poder_aquisitivo:'Poder aquisitivo',pis:'PIS',tse:'Dados eleitorais',parentes:'Parentes',nome:'Nome completo',nasc:'Data de nascimento',renda:'Renda informada na base',estciv:'Estado civil (código)',nacionalid:'Nacionalidade (código)',csba:'Score CSBA',csba_faixa:'Classificação CSBA da fonte',csb8:'Score CSB8',csb8_faixa:'Classificação CSB8 da fonte',dt_inclusao:'Data de inclusão',dt_atualizacao:'Data de atualização',dt_informacao:'Data de informação',logr_nome:'Logradouro',logr_tipo:'Tipo de logradouro',logr_numero:'Número',logr_complemento:'Complemento',status_vt:'Status na fonte',email_score:'Qualidade na fonte'};
+function label(k,labels){return names[k.toLowerCase()]||labels[k.toLowerCase()]||k.replace(/_/g,' ').replace(/^./,c=>c.toUpperCase());}
+function value(k,v){if(missing(v))return 'Não informado';if(typeof v==='boolean')return v?'Sim':'Não';if(/^renda$/i.test(k))return money(v);if(/^(nasc|nascimento|data_nascimento|dt_.*|data_.*)$/i.test(k))return date(v);if(/^(cpf|cep)$/i.test(k))return formatDocument(v,k.toLowerCase(),true);return text(v);}
+function fields(data,labels,depth=0){
+ if(depth>20)return '<p class="rv-note">Estrutura extensa. Consulte a aba JSON para ver os demais níveis.</p>';
+ if(missing(data))return '<p class="rv-note">Não informado</p>';
+ if(typeof data!=='object')return `<p class="rv-text">${escape(text(data))}</p>`;
+ if(!Object.keys(data).length)return '<p class="rv-empty">Nenhum registro retornado</p>';
+ if(Array.isArray(data))return `<div class="rv-records">${data.map((item,i)=>`<article class="rv-record"><h4>Registro ${i+1}</h4>${fields(item,labels,depth+1)}</article>`).join('')}</div>`;
+ const flat=Object.entries(data).filter(([,v])=>v===null||typeof v!=='object');const nested=Object.entries(data).filter(([,v])=>v!==null&&typeof v==='object');
+ return (flat.length?`<dl class="rv-fields">${flat.map(([k,v])=>`<div class="rv-field"><dt>${escape(label(k,labels))}</dt><dd class="${missing(v)?'rv-muted':''}">${escape(value(k,v))}</dd></div>`).join('')}</dl>`:'')+nested.map(([k,v])=>`<details class="rv-details" open><summary>${escape(label(k,labels))}${Array.isArray(v)?` <span>${v.length} registros</span>`:''}</summary>${fields(v,labels,depth+1)}</details>`).join('');
+}
+export function resultMarkup(data,labels={}){
+ if(!data||typeof data!=='object')return `<div class="rv-root"><h3>Resposta da consulta</h3>${fields(data,labels)}</div>`;
+ const payload=data.resultado&&typeof data.resultado==='object'?data.resultado:data;
+ const personal=payload.dados||payload;const name=personal.NOME??personal.nome;const cpf=personal.CPF??personal.cpf;
+ const sections=Array.isArray(payload)?[['Registros',payload]]:Object.entries(payload).filter(([,v])=>v!==null&&typeof v==='object').map(([k,v])=>[label(k,labels),v]);
+ const flat=Array.isArray(payload)?[]:Object.entries(payload).filter(([,v])=>v===null||typeof v!=='object');
+ if(flat.length)sections.unshift(['Informações gerais',Object.fromEntries(flat)]);
+ if(data.resultado){const meta=Object.fromEntries(Object.entries(data).filter(([k])=>k!=='resultado'));if(Object.keys(meta).length)sections.push(['Dados da requisição',meta]);}
+ if(!sections.length)sections.push(['Informações',payload]);
+ const initial=Math.max(0,sections.findIndex(([name])=>name==='Dados pessoais'));
+ return `<div class="rv-root"><div class="rv-overview"><div><p class="rv-caption">Informações retornadas</p><h3>${escape(missing(name)?'Detalhes da consulta':name)}</h3>${missing(cpf)?'':`<p class="rv-document">CPF ${escape(formatDocument(cpf,'cpf',true))}</p>`}</div><span class="rv-source">Dados fornecidos pela fonte</span></div>${data.sucesso===false?'<p class="rv-error">A fonte informou falha na consulta.</p>':''}<div class="rv-tabs" role="tablist" aria-label="Seções do resultado">${sections.map(([name,v],i)=>`<button type="button" role="tab" id="rv-tab-${i}" aria-controls="rv-panel-${i}" aria-selected="${i===initial}" tabindex="${i===initial?0:-1}" data-result-tab="${i}">${escape(name)}${Array.isArray(v)?`<span>${v.length}</span>`:''}</button>`).join('')}</div>${sections.map(([name,v],i)=>`<section class="rv-panel" id="rv-panel-${i}" role="tabpanel" aria-labelledby="rv-tab-${i}" tabindex="0" ${i===initial?'':'hidden'}><div class="rv-section-heading"><h4>${escape(name)}</h4>${Array.isArray(v)?`<span>${v.length} registros retornados</span>`:''}</div>${fields(v,labels)}</section>`).join('')}<p class="rv-disclaimer">Informações da base consultada. O retorno não confirma atualização ou validação dos dados.</p></div>`;
+}
+export function bindResultTabs(container){const tabs=[...container.querySelectorAll('[data-result-tab]')];const select=i=>{tabs.forEach((tab,j)=>{tab.setAttribute('aria-selected',j===i);tab.tabIndex=j===i?0:-1;container.querySelector('#rv-panel-'+j).hidden=j!==i;});};tabs.forEach((tab,i)=>{tab.addEventListener('click',()=>select(i));tab.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const n=e.key==='Home'?0:e.key==='End'?tabs.length-1:(i+(e.key==='ArrowRight'?1:tabs.length-1))%tabs.length;select(n);tabs[n].focus();});});}
