@@ -111,8 +111,8 @@ function init() {
   checkAllApisStatus();
 }
 
-async function checkAllApisStatus() {
-  for (const endpoint of ENDPOINTS) {
+function checkAllApisStatus() {
+  ENDPOINTS.forEach(async (endpoint) => {
     apiStatus[endpoint.id] = 'checking';
     // Atualiza apenas a bolinha no card correspondente, se visível
     updateCardStatusVisual(endpoint.id);
@@ -127,7 +127,7 @@ async function checkAllApisStatus() {
       apiStatus[endpoint.id] = 'offline';
     }
     updateCardStatusVisual(endpoint.id);
-  }
+  });
 }
 
 function updateCardStatusVisual(id) {
