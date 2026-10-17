@@ -62,3 +62,15 @@ Respostas HTTP 400 (documento inválido), 403 (acesso recusado), 404 (não encon
 BrasilAPI consulta a Minha Receita para este recurso, portanto essas duas opções compartilham a mesma fonte. HTTP 403 da BrasilAPI não indica falta de créditos: ela dispensa chave. O intervalo local de 1 segundo é uma proteção do aplicativo, não uma cota oficial anunciada. Esses ajustes não alteram a implantação da API administrativa na Vercel.
 
 Referências: [documentação CNPJ](https://brasilapi.com.br/docs#tag/CNPJ), [contrato oficial](https://github.com/BrasilAPI/BrasilAPI/blob/main/pages/docs/doc/cnpj.json), [cálculo do DV pela Receita Federal](https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/documentos-tecnicos/cnpj/manual-dv-cnpj.pdf).
+
+## Validação e interpretação das consultas
+
+As consultas antigas de apisbrasilpro.site agora usam a mesma validação no navegador, no servidor de desenvolvimento e no proxy de produção. O sistema exige ao menos um critério de pesquisa; valida CPF e CNPJ numérico com dígitos verificadores; verifica os formatos de CEP, telefone, placa, e-mail e demais campos; rejeita parâmetros desconhecidos/repetidos e exige os seletores correspondentes à busca. Algumas entradas de exemplo antigas do fornecedor podem ser recusadas por serem inválidas.
+
+HTTP 200 indica somente que a resposta chegou. O painel interpreta indicadores como sucesso, success, encontrado, status interno, contagens e listas e distingue: Registros retornados, Nenhum registro encontrado, Falha na consulta, Resposta inválida, Resposta recebida e Resultado parcial. Apenas consultas classificadas como Registros retornados entram no histórico de sucesso. Entradas anteriores do histórico aparecem como respostas não verificadas.
+
+Na API Full, o painel interpreta cada conteudo das fontes individualmente e não usa encontrado=true ou total_fontes_com_dados como prova de registros. Fontes vazias ou com erro não são contadas como fontes com registros, e a visualização identifica cada resposta separadamente. Os indicadores originais do agregador continuam visíveis, explicitamente identificados como não confirmados.
+
+O prefixo conhecido de autoria do fornecedor, inclusive repetido, é removido para ler JSON. HTML e texto inesperado não são classificados como consultas bem-sucedidas. A leitura dos resultados não confirma autenticidade, atualização ou procedência da base externa. Esta correção não altera a hospedagem das rotas administrativas na Vercel.
+
+Verificação da correção: 28 testes automatizados aprovados e build das três páginas. O navegador verificou CPF inválido bloqueado sem chamada externa, HTTP 200 com lista vazia/status 404, resultado parcial, erro HTTP 503, HTML inesperado, histórico sem falsos sucessos e um registro sintético válido. Os testes de regressão usam respostas sintéticas baseadas nos formatos observados, sem consultar pessoas nem consumir créditos.
