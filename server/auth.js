@@ -1,6 +1,7 @@
 import {randomBytes,scryptSync,timingSafeEqual} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {integrations} from './integrations.js';
+import {legacyProxy} from './legacy-proxy.js';
 const lifetime=8*60*60*1000;
 const loginPage=readFileSync(new URL('./login.html',import.meta.url),'utf8');
 function reply(res,status,data){res.statusCode=status;res.setHeader('Content-Type','application/json; charset=utf-8');res.end(JSON.stringify(data));}
@@ -34,4 +35,4 @@ export function createAuthentication({credentialsPath=new URL('./.credentials.js
  };
 }
 export const authentication=createAuthentication();
-export const authPlugin={name:'access-control',configureServer(server){server.middlewares.use(authentication);server.middlewares.use(integrations);},configurePreviewServer(server){server.middlewares.use(authentication);server.middlewares.use(integrations);}};
+export const authPlugin={name:'access-control',configureServer(server){server.middlewares.use(authentication);server.middlewares.use(integrations);server.middlewares.use(legacyProxy);},configurePreviewServer(server){server.middlewares.use(authentication);server.middlewares.use(integrations);server.middlewares.use(legacyProxy);}};

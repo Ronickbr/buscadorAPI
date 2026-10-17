@@ -1,6 +1,9 @@
 import { resultMarkup, bindResultTabs } from './results-view.js';
 import { formatResultText } from './format-result.js';
 import { CATEGORIES, ENDPOINTS } from './endpoints.js';
+import {validateDocument} from '../shared/documents.js';
+import {validateLegacyQuery} from '../shared/query-validation.js';
+import {parseProviderResponse as parseResponseBody,classifyQueryResponse,outcome} from '../shared/query-outcome.js';
 
 const CATEGORY_ICONS = {"all":"<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><rect x=\"3\" y=\"3\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"3\" y=\"14\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"14\" y=\"14\" width=\"7\" height=\"7\" rx=\"1\"/></svg>","pessoas":"<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M4 21v-2a8 8 0 0 1 16 0v2\"/></svg>","telefones":"<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><rect x=\"6\" y=\"2\" width=\"12\" height=\"20\" rx=\"2\"/><path d=\"M10 18h4\"/></svg>","veiculos":"<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"m5 7 2-4h10l2 4 2 4v7H3v-7Z M3 11h18 M6 18v3 M18 18v3 M6 14h2 M16 14h2\"/></svg>","credito":"<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><rect x=\"2\" y=\"5\" width=\"20\" height=\"14\" rx=\"2\"/><path d=\"M2 10h20 M6 15h4\"/></svg>","fotos":"<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\"/><circle cx=\"8\" cy=\"8\" r=\"1\"/><path d=\"m3 17 6-6 4 4 3-3 5 5\"/></svg>","trabalho":"<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><rect x=\"3\" y=\"7\" width=\"18\" height=\"14\" rx=\"2\"/><path d=\"M8 7V3h8v4 M3 13h18 M10 13v3h4v-3\"/></svg>","completa":"<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"10\" cy=\"10\" r=\"7\"/><path d=\"m15 15 6 6\"/></svg>"};
 // State Management
@@ -10,6 +13,7 @@ let selectedEndpoint = null;
 let queryHistory = [];
 try { const saved = JSON.parse(localStorage.getItem('api_query_history') || '[]'); if (Array.isArray(saved)) queryHistory = saved.filter(x => x && typeof x === 'object').slice(0,30); } catch {} 
 let currentResponseData = null;
+let currentOutcome = null;
 let viewMode = 'visual'; // 'visual' | 'raw'
 
 // API Status Tracker
@@ -268,10 +272,9 @@ async function executeQuery() {
   if (!selectedEndpoint || btnExecuteQuery.disabled) return;
   if (!queryFormEl.reportValidity()) return;
   const queryEndpoint = selectedEndpoint;
-  queryRunning = true;
 
   const formData = new FormData(queryFormEl);
-  const queryParams = new URLSearchParams();
+  let queryParams = new URLSearchParams();
   
   for (let [key, value] of formData.entries()) {
     if (key !== 'script' && value.trim() !== '') {
@@ -280,6 +283,19 @@ async function executeQuery() {
   }
 
   const scriptName = formData.get('script') || selectedEndpoint.endpoint;
+  try{
+    if(queryEndpoint.provider){
+      const field=queryEndpoint.params[0].name;
+      const value=validateDocument(field,formData.get(field),{allowAlphanumeric:queryEndpoint.provider==='brasilapi'});
+      if(!value)throw new Error(`Informe um ${field.toUpperCase()} válido.`);
+      formData.set(field,value);
+    }else queryParams=validateLegacyQuery(scriptName,queryParams);
+  }catch(error){
+    currentResponseData={erro:error.message};currentOutcome=outcome('invalid',error.message);
+    responseStatusBadge.className='status-badge error';responseStatusBadge.textContent='Entrada inválida';responseTimeBadge.textContent='';
+    renderResponseContent();showToast(error.message,'error');return;
+  }
+  queryRunning = true;
   const queryString = queryParams.toString();
   
   const proxyUrl = queryEndpoint.provider?'/api/integrations/query':`/api-proxy/${scriptName}${queryString ? '?' + queryString : ''}`;
@@ -312,13 +328,14 @@ async function executeQuery() {
     let parsedData = parseResponseBody(rawText);
 
     currentResponseData = parsedData;
+    currentOutcome = classifyQueryResponse(parsedData,{httpStatus:response.status});
+    responseTimeBadge.textContent=`${duration} ms · HTTP ${response.status}`;
+    renderResponseContent();
 
-    if (response.ok) {
+    if (currentOutcome.successful) {
       responseStatusBadge.className = 'status-badge success';
-      responseStatusBadge.textContent = `200 OK`;
-      responseTimeBadge.textContent = `⚡ ${duration} ms`;
-      renderResponseContent();
-      showToast(`Consulta concluída em ${duration} ms`, 'success');
+      responseStatusBadge.textContent = currentOutcome.label;
+      showToast(currentOutcome.label, 'success');
 
       addToHistory({
         id: Date.now(),
@@ -328,14 +345,14 @@ async function executeQuery() {
         params: queryEndpoint.provider?{}:Object.fromEntries(queryParams.entries()),
         time: new Date().toLocaleTimeString('pt-BR'),
         status: response.status,
+        outcome: currentOutcome.kind,
         duration
       });
     } else {
-      responseStatusBadge.className = 'status-badge error';
-      responseStatusBadge.textContent = `HTTP ${response.status} ${response.statusText}`;
-      responseTimeBadge.textContent = `${duration} ms`;
-      renderResponseContent();
-      showToast(`Erro na requisição: ${response.status}`, 'error');
+      const failed=['error','invalid'].includes(currentOutcome.kind);
+      responseStatusBadge.className = `status-badge ${failed?'error':'idle'}`;
+      responseStatusBadge.textContent = currentOutcome.label;
+      showToast(currentOutcome.label,failed?'error':'info');
     }
   } catch (error) {
     const endTime = performance.now();
@@ -346,6 +363,7 @@ async function executeQuery() {
     responseTimeBadge.textContent = `${duration} ms`;
     
     currentResponseData = { error: error.message, detail: 'Falha ao conectar com o servidor proxy ou API externa.' };
+    currentOutcome = outcome('error',error.name==='TimeoutError'?'O tempo de resposta foi excedido. Tente novamente mais tarde.':'Não foi possível receber a resposta da fonte.');
     renderResponseContent();
     showToast('Erro de conexão ou CORS ao acessar a API', 'error');
   } finally {
@@ -354,28 +372,6 @@ async function executeQuery() {
     btnExecuteQuery.innerHTML = 'Consultar agora →';
     if(queryEndpoint.provider)checkAllApisStatus();
   }
-}
-
-// Parse Raw Server Output (Extract embedded JSON if text header exists)
-function parseResponseBody(rawText) {
-  if (!rawText) return null;
-
-  // Try direct JSON parse
-  try {
-    return JSON.parse(rawText);
-  } catch (e) {
-    // If text contains embedded JSON like "api desenvolvida por ... { ... }"
-    const jsonMatch = rawText.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
-    if (jsonMatch) {
-      try {
-        return JSON.parse(jsonMatch[1]);
-      } catch (err) {
-        // Fallback to raw text
-      }
-    }
-  }
-
-  return rawText;
 }
 
 // Render Response Based on View Mode (Visual vs Raw JSON)
@@ -389,6 +385,11 @@ function renderResponseContent() {
     renderRawJson(currentResponseData);
   } else {
     renderVisualFormattedCards(currentResponseData);
+  }
+  if(currentOutcome){
+    const notice=document.createElement('p');
+    notice.className=['error','invalid'].includes(currentOutcome.kind)?'rv-error':'rv-note';
+    notice.textContent=currentOutcome.message;responseBodyEl.prepend(notice);
   }
 }
 
@@ -487,7 +488,7 @@ function renderHistory() {
       </div>
       <div class="history-item-url">${escapeHtml(item.url)}</div>
       <div style="font-size:10px; color:var(--text-dim); display:flex; justify-content:space-between; margin-top:4px;">
-        <span>Status: <strong style="color:var(--accent-green);">${item.status}</strong></span>
+        <span>${item.outcome==='found'?'Registros retornados':'Resposta anterior não verificada'} · HTTP ${escapeHtml(String(item.status))}</span>
         <span>Latência: ${item.duration} ms</span>
       </div>
     </div>
@@ -609,7 +610,8 @@ function showToast(message, type = 'info') {
   const toast = document.createElement('div');
   toast.className = 'toast';
   const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
-  toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+  const iconElement=document.createElement('span'),messageElement=document.createElement('span');
+  iconElement.textContent=icon;messageElement.textContent=message;toast.append(iconElement,messageElement);
   toastContainer.appendChild(toast);
   setTimeout(() => {
     toast.style.opacity = '0';
