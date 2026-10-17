@@ -4,6 +4,20 @@ import {randomBytes,createCipheriv,createDecipheriv} from 'node:crypto';
 import {PROVIDERS,validateDocument} from './providers.js';
 
 function fault(status,message){return Object.assign(new Error(message),{status});}
+function upstreamFailure(provider,status){
+  if(provider.id==='brasilapi'){
+    const messages={
+      400:'CNPJ inválido ou mal formatado, conforme a BrasilAPI. Confira o documento informado.',
+      403:'A BrasilAPI recusou o acesso (HTTP 403). Este provedor não utiliza chave de API. Tente mais tarde ou selecione outro provedor de CNPJ.',
+      404:'CNPJ não encontrado na base consultada pela BrasilAPI.',
+      429:'Limite de requisições da BrasilAPI atingido. Aguarde antes de tentar novamente.',
+      503:'Consulta de CNPJ temporariamente indisponível na BrasilAPI/Minha Receita. Tente novamente mais tarde.',
+    };
+    return fault(messages[status]?status:502,messages[status]||'A BrasilAPI não conseguiu concluir a consulta. Tente novamente mais tarde.');
+  }
+  const messages={401:'Chave recusada pelo provedor. Revise a administração.',403:provider.freeLimit?'Acesso ou créditos recusados pelo provedor.':'O provedor público recusou o acesso. Tente novamente mais tarde.',404:'Nenhum registro encontrado na base do provedor.',429:'Limite do provedor atingido. Aguarde e confira o saldo.'};
+  return fault([401,403].includes(status)?502:status===404?404:status===429?429:502,messages[status]||'O provedor recusou a consulta.');
+}
 export function sameOrigin(req){
   const secure=req.socket.encrypted||process.env.COOKIE_SECURE==='true';
   return req.headers.origin===`${secure?'https':'http'}://${req.headers.host}`;
@@ -82,7 +96,7 @@ export function createIntegrations({directory=resolve('server/.private'),fetcher
       if(path==='/api/integrations/query'&&req.method==='POST'){
         const body=await jsonBody(req),p=PROVIDERS.find(p=>p.id===body?.provider);
         if(!p)throw fault(400,'Selecione um provedor disponível.');
-        const value=validateDocument(p.kind,body.value);if(!value)throw fault(400,`Informe um ${p.kind.toUpperCase()} válido.`);
+        const value=validateDocument(p.kind,body.value,{allowAlphanumeric:p.alphanumeric});if(!value)throw fault(400,`Informe um ${p.kind.toUpperCase()} válido.`);
         const apiKey=await locked(async()=>{
           const state=await load(),c=config(state,p),now=clock();
           if(!c.enabled)throw fault(403,'Integração desativada. Acesse a administração.');
@@ -95,14 +109,20 @@ export function createIntegrations({directory=resolve('server/.private'),fetcher
         let upstream,data;
         try{
           upstream=await fetcher(p.url(value),{headers:{Accept:'application/json',...(p.freeLimit?{'X-API-Key':apiKey}:{})},signal:AbortSignal.timeout(20000),redirect:'error'});
+        }catch{
+          if(p.id==='brasilapi')throw upstreamFailure(p,503);
+          throw fault(502,'O provedor não respondeu corretamente. A tentativa foi contada no limite local; evite repetir antes de conferir seu saldo.');
+        }
+        // Classify HTTP errors before parsing: gateways may return HTML or plain text.
+        if(!upstream.ok){
+          await upstream.body?.cancel().catch(()=>{});
+          throw upstreamFailure(p,upstream.status);
+        }
+        try{
           const responseText=await upstream.text();
           if(responseText.length>2_000_000)throw new Error('Response too large');
           data=JSON.parse(responseText);
         }catch{throw fault(502,'O provedor não respondeu corretamente. A tentativa foi contada no limite local; evite repetir antes de conferir seu saldo.');}
-        if(!upstream.ok){
-          const messages={401:'Chave recusada pelo provedor. Revise a administração.',403:'Acesso ou créditos recusados pelo provedor.',404:'Nenhum registro encontrado na base do provedor.',429:'Limite do provedor atingido. Aguarde e confira o saldo.'};
-          throw fault([401,403].includes(upstream.status)?502:upstream.status===404?404:upstream.status===429?429:502,messages[upstream.status]||'O provedor recusou a consulta.');
-        }
         if(!data||data.erro||data.success===false||data.status==='ERROR')throw fault(404,'Nenhum resultado disponível para esta consulta.');
         send(res,200,{fonte:p.name,observacao:p.description,resultado:data.data??data});return;
       }

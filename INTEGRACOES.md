@@ -6,7 +6,7 @@ Após entrar, selecione **APIs gratuitas** para consultar ou **Administração**
 
 | Provedor | Consulta | Chave | Condição anunciada em 17/10/2026 |
 | --- | --- | --- | --- |
-| [BrasilAPI](https://brasilapi.com.br/docs) | CNPJ numérico | Não | Pública; cota mensal numérica não confirmada |
+| [BrasilAPI](https://brasilapi.com.br/docs#tag/CNPJ) | CNPJ numérico ou alfanumérico | Não | Pública; cota mensal numérica não confirmada |
 | [Minha Receita](https://docs.minhareceita.org/como-usar/) | CNPJ numérico | Não | Pública; atualização depende da base |
 | [CNPJ.ws](https://docs.cnpj.ws/referencia-de-api/api-publica/consultando-cnpj) | CNPJ numérico | Não | Até 3 requisições por minuto/IP |
 | [ReceitaWS](https://developers.receitaws.com.br/) | CNPJ numérico | Não | Até 3 consultas por minuto; apenas cache |
@@ -52,3 +52,13 @@ Execute **um único processo Node** com esse armazenamento. Múltiplas réplicas
 Também foi verificado no navegador o fluxo compilado de login, administração, persistência de configuração, consulta simulada, histórico sem documento no novo fluxo, ausência de erros JavaScript, layout em 1440 px e 390 px e logout. Consultas CPF reais dependem das chaves cadastradas pelo proprietário.
 
 Em uma verificação pontual dos endpoints públicos em 17/10/2026, ViaCEP, Minha Receita, CNPJ.ws e ReceitaWS responderam HTTP 200 com JSON. BrasilAPI respondeu HTTP 403 neste ambiente. Isso pode variar conforme rede e disponibilidade; a interface não classifica uma fonte como online apenas por estar configurada. Nenhuma chave ou consulta CPF real foi utilizada nessa verificação.
+
+## Compatibilidade da BrasilAPI
+
+A integração aceita CNPJ numérico e alfanumérico, com ou sem pontuação, normaliza letras para maiúsculas e valida os dois dígitos verificadores por módulo 11. Para letras, o valor de cálculo é o código ASCII menos 48, conforme a Receita Federal. A entrada alfanumérica fica habilitada somente para BrasilAPI; os demais provedores mantêm os formatos anteriores.
+
+Respostas HTTP 400 (documento inválido), 403 (acesso recusado), 404 (não encontrado), 429 (limite de requisições) e 503 (indisponibilidade temporária) têm mensagens específicas e preservam o código. A classificação ocorre antes da leitura de JSON, pois erros de infraestrutura podem vir em HTML ou texto. Falhas de transporte da BrasilAPI retornam 503; respostas de sucesso com JSON inválido retornam 502. Nenhum corpo de erro do fornecedor é exposto nem há repetição automática das chamadas.
+
+BrasilAPI consulta a Minha Receita para este recurso, portanto essas duas opções compartilham a mesma fonte. HTTP 403 da BrasilAPI não indica falta de créditos: ela dispensa chave. O intervalo local de 1 segundo é uma proteção do aplicativo, não uma cota oficial anunciada. Esses ajustes não alteram a implantação da API administrativa na Vercel.
+
+Referências: [documentação CNPJ](https://brasilapi.com.br/docs#tag/CNPJ), [contrato oficial](https://github.com/BrasilAPI/BrasilAPI/blob/main/pages/docs/doc/cnpj.json), [cálculo do DV pela Receita Federal](https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/documentos-tecnicos/cnpj/manual-dv-cnpj.pdf).
