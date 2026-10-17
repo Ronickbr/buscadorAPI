@@ -1,5 +1,5 @@
 export const FREE_ENDPOINTS = [
-  ['brasilapi','BrasilAPI · CNPJ','cnpj','Cadastro, atividades, endereço e sócios. Consulta pública sem chave.'],
+  ['brasilapi','BrasilAPI · CNPJ','cnpj','CNPJ numérico ou alfanumérico: cadastro, atividades, endereço e sócios. Sem chave; fonte Minha Receita.'],
   ['minhareceita','Minha Receita · CNPJ','cnpj','Dados públicos de empresas. Sem chave; atualização depende da base.'],
   ['cnpjws','CNPJ.ws · CNPJ','cnpj','Consulta pública sem chave. Até 3 requisições por minuto por IP.'],
   ['receitaws','ReceitaWS · CNPJ','cnpj','Consulta pública de empresas em cache. Até 3 consultas por minuto.'],

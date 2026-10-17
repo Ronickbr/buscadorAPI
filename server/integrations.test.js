@@ -32,6 +32,65 @@ test('validates CPF, CNPJ and CEP before using any provider',()=>{
   assert.equal(validateDocument('cep','01001-000'),'01001000');
   assert.equal(validateDocument('cep','https://evil.test'),null);
 });
+test('validates numeric and alphanumeric CNPJ check digits using Receita Federal examples',()=>{
+  const options={allowAlphanumeric:true};
+  for(const [input,expected]of [
+    ['12.ABC.345/01DE-35','12ABC34501DE35'],
+    ['12abc34501de35','12ABC34501DE35'],
+    [' 12.ABC.345/01DE-35 ','12ABC34501DE35'],
+    ['00.000.000/E08G-12','00000000E08G12'],
+    ['19.131.243/0001-97','19131243000197'],
+    ['00.000.000/0001-91','00000000000191'],
+  ])assert.equal(validateDocument('cnpj',input,options),expected,input);
+  for(const input of ['12ABC34501DE34','12ABC34501DE3A','12ABC34501DE3','12ABC34501DE355','12-ABC34501DE35','12 ABC34501DE35','12ABC34501DÉ35','https://evil.test','12ABC34501DE35?x=1','00000000000000',null,123]){
+    assert.equal(validateDocument('cnpj',input,options),null,String(input));
+  }
+  // Alpha support is explicit per provider and never strips letters into a different ID.
+  assert.equal(validateDocument('cnpj','12ABC34501DE35'),null);
+  assert.equal(validateDocument('cpf','12ABC34501DE35',options),null);
+  assert.equal(validateDocument('cep','12ABC345',options),null);
+});
+test('BrasilAPI forwards normalized alpha CNPJ without a key and preserves company fields',async t=>{
+  const payload={cnpj:'12ABC34501DE35',razao_social:'EMPRESA SINTÉTICA',capital_social:0,qsa:[],opcao_pelo_mei:false,email:null};
+  let call;
+  const f=await fixture(t,{fetcher:async(url,options)=>{call={url,options};return Response.json(payload);}});
+  const response=await lookup(f,'brasilapi','12.abc.345/01de-35');
+  assert.equal(response.status,200);
+  assert.equal(call.url,'https://brasilapi.com.br/api/cnpj/v1/12ABC34501DE35');
+  assert.equal(call.options.headers['X-API-Key'],undefined);assert.equal(call.options.redirect,'error');
+  assert.deepEqual((await response.json()).resultado,payload);
+});
+test('BrasilAPI rejects malformed alpha documents locally and keeps other provider formats unchanged',async t=>{
+  const f=await fixture(t);
+  for(const value of ['12ABC34501DE34','12ABC34501DE3A','12ABC34501DE35/../../secret'])assert.equal((await lookup(f,'brasilapi',value)).status,400);
+  for(const provider of ['cnpjws','receitaws','minhareceita'])assert.equal((await lookup(f,provider,'12ABC34501DE35')).status,400);
+  assert.equal(f.calls.length,0);
+});
+test('BrasilAPI preserves HTTP 400, 403, 404, 429 and 503 even with non-JSON error bodies',async t=>{
+  for(const [status,phrase]of [[400,'CNPJ inválido'],[403,'recusou o acesso'],[404,'não encontrado'],[429,'Limite de requisições'],[503,'temporariamente indisponível']]){
+    for(const body of [JSON.stringify({message:'private-error-marker'}),'<html>private-error-marker</html>']){
+      const f=await fixture(t,{fetcher:async()=>new Response(body,{status})});
+      const response=await lookup(f,'brasilapi','19131243000197');
+      assert.equal(response.status,status);assert.equal(response.headers.get('cache-control'),'no-store');
+      const data=await response.json();assert.ok(data.error.includes(phrase));assert.ok(!data.error.includes('private-error-marker'));
+      if(status===403)assert.ok(!/créditos|saldo/.test(data.error));
+    }
+  }
+});
+test('BrasilAPI transport failures return sanitized 503 and remain counted locally',async t=>{
+  const f=await fixture(t,{fetcher:async()=>{throw new Error('private-network-details');}});
+  const response=await lookup(f,'brasilapi','19131243000197');assert.equal(response.status,503);
+  const data=await response.json();assert.match(data.error,/temporariamente indisponível/);assert.ok(!data.error.includes('private-network-details'));
+  const providers=(await (await f.request('/api/integrations')).json()).providers;
+  assert.equal(providers.find(p=>p.id==='brasilapi').used,1);
+});
+test('BrasilAPI invalid success JSON and unexpected HTTP errors fail safely without retry',async t=>{
+  for(const [status,body]of [[200,'<html>private-error</html>'],[500,'private-error'],[401,'private-error']]){
+    let calls=0;const f=await fixture(t,{fetcher:async()=>{calls++;return new Response(body,{status});}});
+    const response=await lookup(f,'brasilapi','19131243000197');assert.equal(response.status,502);
+    assert.ok(!(await response.text()).includes('private-error'));assert.equal(calls,1);
+  }
+});
 test('blocks anonymous users, non-admin settings and cross-origin writes',async t=>{
   const anon=await fixture(t,{authenticated:false});assert.equal((await anon.request('/api/admin/providers')).status,401);
   const user=await fixture(t,{role:'user'});assert.equal((await user.request('/api/admin/providers')).status,403);
