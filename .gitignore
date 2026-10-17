@@ -1,3 +1,10 @@
 server/.credentials.json
+server/.private/
+.env
+.env.*
+!.env.example
+test-results/
+.npm-cache/
+.impeccable/review/
 node_modules/
 dist/

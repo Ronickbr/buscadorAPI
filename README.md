@@ -23,7 +23,7 @@ Fornecer uma interface clara e sóbria para o uso interno (com futura abertura p
 ## 🚀 Como Executar o Projeto
 
 ### Pré-requisitos
-Certifique-se de ter o [Node.js](https://nodejs.org/) instalado na sua máquina.
+Use [Node.js](https://nodejs.org/) 22.12 ou superior (testado com Node 24). Autenticação e integrações exigem o servidor Node; hospedagem apenas estática não é suficiente.
 
 ### Instalação
 
@@ -82,3 +82,9 @@ Este projeto foi desenhado evitando o uso excessivo de elementos visuais distrat
 
 ---
 *Desenvolvido por [Ronick](https://github.com/Ronickbr).*
+
+## Integrações gratuitas e administração
+
+Sete novas fontes para CPF, CNPJ e CEP, cadastro protegido de chaves e limites locais de tentativas. Após entrar, clique em **Administração**. Veja [INTEGRACOES.md](INTEGRACOES.md) para criar contas gratuitas, configurar as chaves e preservar os dados do servidor.
+
+Execute `npm test` para verificar acesso e integrações sem consumir créditos. O build inclui as páginas principal, cadastral e administrativa.

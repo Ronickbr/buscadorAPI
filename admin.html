@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Integrações · Administração · Me Encontre</title>
+  <link rel="stylesheet" href="/src/style.css">
+  <link rel="stylesheet" href="/src/admin.css">
+</head>
+<body>
+  <a class="skip-link" href="#providers">Ir para as integrações</a>
+  <div class="admin-shell">
+    <header class="admin-header"><a href="/" class="admin-brand">Me Encontre <span>/ Administração</span></a><nav aria-label="Navegação"><a class="btn-icon" href="/">Voltar às consultas</a><button type="button" class="btn-icon" id="logoutButton">Sair</button></nav></header>
+    <main>
+      <div class="admin-intro"><h1>Integrações gratuitas</h1><p>Escolha as fontes disponíveis e configure as chaves em um só lugar.</p></div>
+      <section class="admin-guidance" aria-labelledby="guidanceTitle"><h2 id="guidanceTitle">Comece pelas fontes públicas</h2><p>CNPJ e CEP funcionam sem chave. Para consultar CPF, crie sua conta no fornecedor, escolha o plano gratuito e cadastre sua chave abaixo. Nenhuma conta é criada automaticamente.</p><p>As chaves ficam criptografadas no servidor. O limite local conta todas as tentativas, inclusive falhas, e bloqueia novas chamadas ao atingir a cota. O saldo usado em outros sistemas não é conhecido aqui.</p><p id="usageNote">Carregando informações de consumo…</p></section>
+      <p id="adminStatus" class="admin-status" role="status" aria-live="polite">Carregando integrações…</p>
+      <div id="providers" class="providers-list" aria-busy="true"></div>
+      <button type="button" id="reloadProviders" class="btn-icon">Atualizar configurações e consumo</button>
+    </main>
+    <footer class="admin-footer">Acesso do administrador · Créditos e condições são definidos por cada fornecedor.</footer>
+  </div>
+  <script type="module" src="/src/admin.js"></script>
+  <script type="module" src="/src/logout.js"></script>
+</body>
+</html>
