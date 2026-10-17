@@ -17,3 +17,9 @@ Use HTTPS. Quando houver um proxy HTTPS na frente do Node, configure COOKIE_SECU
 
 ## Verificação
 Testados: páginas e API sem sessão, credenciais inválidas, login válido, acesso autenticado, cookie HttpOnly/SameSite, rejeição de origem externa, logout e invalidação da sessão. Build aprovado.
+
+## Administração das integrações
+
+O usuário único configurado administra o sistema em `/admin.html`. Não é necessário criar outro login. As rotas `/api/admin/*` exigem sessão de administrador; gravações e novas consultas exigem origem igual à do aplicativo. As chaves dos fornecedores não são devolvidas pela API de configuração.
+
+Configurações e contadores ficam em `server/.private/`, criptografados, fora do build e do Git. Preserve a pasta inteira ao atualizar o código. O contador representa tentativas locais, sem sincronizar créditos do fornecedor. Veja limites, criação de contas e implantação em [INTEGRACOES.md](INTEGRACOES.md).

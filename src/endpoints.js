@@ -1,5 +1,7 @@
+import {FREE_ENDPOINTS} from './free-endpoints.js';
 export const CATEGORIES = [
   { id: 'all', name: 'Todas as APIs', icon: '⚡' },
+  { id: 'gratuitas', name: 'APIs gratuitas', icon: '✓' },
   { id: 'pessoas', name: 'Pessoas & Documentos', icon: '👤' },
   { id: 'telefones', name: 'Telefones & Cadastro', icon: '📞' },
   { id: 'veiculos', name: 'Veículos & Detran', icon: '🚗' },
@@ -10,6 +12,7 @@ export const CATEGORIES = [
 ];
 
 export const ENDPOINTS = [
+  ...FREE_ENDPOINTS,
   {
     id: 'consulta_serasa',
     name: 'Consulta Serasa',

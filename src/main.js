@@ -14,6 +14,9 @@ let viewMode = 'visual'; // 'visual' | 'raw'
 
 // API Status Tracker
 const apiStatus = {}; // item.id -> 'online' | 'offline' | 'checking'
+const providerState = {};
+let queryRunning = false;
+CATEGORY_ICONS.gratuitas = CATEGORY_ICONS.all;
 
 // Key Label Translator Dictionary
 const FIELD_LABELS = {
@@ -111,24 +114,18 @@ function init() {
   checkAllApisStatus();
 }
 
-function checkAllApisStatus() {
-  ENDPOINTS.forEach(async (endpoint) => {
-    apiStatus[endpoint.id] = 'checking';
-    // Atualiza apenas a bolinha no card correspondente, se visível
-    updateCardStatusVisual(endpoint.id);
-    
-    try {
-      const proxyUrl = `/api-proxy/${endpoint.endpoint}`;
-      // Faz um request rápido (HEAD) apenas para ver se o proxy e o destino respondem
-      const res = await fetch(proxyUrl, { method: 'HEAD', signal: AbortSignal.timeout(10000) });
-      // Se respondeu, consideramos online (mesmo que retorne erro de falta de parâmetro)
-      apiStatus[endpoint.id] = (res.status >= 200 && res.status < 500) ? 'online' : 'offline';
-    } catch (err) {
-      apiStatus[endpoint.id] = 'offline';
-    }
-    updateCardStatusVisual(endpoint.id);
-  });
+async function checkAllApisStatus() {
+  try {
+    const response=await fetch('/api/integrations');
+    if(!response.ok)throw new Error();
+    const data=await response.json();
+    for(const p of data.providers)providerState[p.id]=p;
+  } catch { for(const key of Object.keys(providerState))delete providerState[key]; }
+  renderEndpoints();
+  if(selectedEndpoint?.provider)btnExecuteQuery.disabled=queryRunning||!isProviderReady(selectedEndpoint.provider);
 }
+function isProviderReady(id){const p=providerState[id];return p?.enabled&&p.configured&&(p.remaining===null||p.remaining>0);}
+function providerLabel(id){const p=providerState[id];if(!p)return 'Configuração indisponível';if(!p.configured)return 'Cadastre a chave em Administração';if(!p.enabled)return 'Desativada na administração';if(p.remaining===0)return 'Limite local atingido';return p.remaining===null?'Sem chave · consulte sob demanda':`${p.remaining} tentativas locais restantes neste mês`;}
 
 function updateCardStatusVisual(id) {
   const card = document.querySelector(`.api-card[data-id="${id}"]`);
@@ -203,6 +200,7 @@ function renderEndpoints() {
         <span class="badge">${item.badge}</span>
       </div>
       <p class="api-card-desc">${item.description}</p>
+      ${item.provider?`<p class="provider-availability">${providerLabel(item.provider)}</p>`:''}
     </button>
   `}).join('');
 }
@@ -214,7 +212,7 @@ function selectEndpoint(endpoint) {
 
   selectedApiNameEl.textContent = endpoint.name;
   selectedApiDescEl.textContent = endpoint.description;
-  btnExecuteQuery.disabled = false;
+  btnExecuteQuery.disabled = queryRunning || (endpoint.provider&&!isProviderReady(endpoint.provider));
 
   queryFormEl.innerHTML = endpoint.params.map(p => {
     if (p.type === 'select') {
@@ -269,6 +267,8 @@ function fillFormWithExample(exampleParams) {
 async function executeQuery() {
   if (!selectedEndpoint || btnExecuteQuery.disabled) return;
   if (!queryFormEl.reportValidity()) return;
+  const queryEndpoint = selectedEndpoint;
+  queryRunning = true;
 
   const formData = new FormData(queryFormEl);
   const queryParams = new URLSearchParams();
@@ -282,24 +282,27 @@ async function executeQuery() {
   const scriptName = formData.get('script') || selectedEndpoint.endpoint;
   const queryString = queryParams.toString();
   
-  const proxyUrl = `/api-proxy/${scriptName}${queryString ? '?' + queryString : ''}`;
-  const displayUrl = `http://apisbrasilpro.site/${scriptName}${queryString ? '?' + queryString : ''}`;
+  const proxyUrl = queryEndpoint.provider?'/api/integrations/query':`/api-proxy/${scriptName}${queryString ? '?' + queryString : ''}`;
+  const displayUrl = queryEndpoint.provider?queryEndpoint.name:`http://apisbrasilpro.site/${scriptName}${queryString ? '?' + queryString : ''}`;
 
   btnExecuteQuery.disabled = true;
   btnExecuteQuery.innerHTML = '<div class="spinner"></div> Processando Consulta...';
   responseStatusBadge.className = 'status-badge idle';
   responseStatusBadge.textContent = 'Enviando Requisição...';
   responseTimeBadge.textContent = '';
-  responseBodyEl.innerHTML = '<div class="empty-response"><div class="spinner" style="width:36px;height:36px;"></div><span style="color:var(--text-muted);">Consultando banco de dados no apisbrasilpro.site...</span></div>';
+  responseBodyEl.innerHTML = '<div class="empty-response"><div class="spinner"></div><span>Consultando o provedor selecionado…</span></div>';
 
   const startTime = performance.now();
 
   try {
     const response = await fetch(proxyUrl, {
-      method: 'GET',
+      method: queryEndpoint.provider?'POST':'GET',
       headers: {
-        'Accept': 'application/json, text/plain, */*'
-      }
+        'Accept': 'application/json, text/plain, */*',
+        ...(queryEndpoint.provider?{'Content-Type':'application/json'}:{})
+      },
+      ...(queryEndpoint.provider?{body:JSON.stringify({provider:queryEndpoint.provider,value:formData.get(queryEndpoint.params[0].name)})}:{}),
+      signal:AbortSignal.timeout(35000)
     });
 
     const endTime = performance.now();
@@ -319,10 +322,10 @@ async function executeQuery() {
 
       addToHistory({
         id: Date.now(),
-        apiName: selectedEndpoint.name,
+        apiName: queryEndpoint.name,
         endpoint: scriptName,
         url: displayUrl,
-        params: Object.fromEntries(queryParams.entries()),
+        params: queryEndpoint.provider?{}:Object.fromEntries(queryParams.entries()),
         time: new Date().toLocaleTimeString('pt-BR'),
         status: response.status,
         duration
@@ -346,8 +349,10 @@ async function executeQuery() {
     renderResponseContent();
     showToast('Erro de conexão ou CORS ao acessar a API', 'error');
   } finally {
-    btnExecuteQuery.disabled = false;
+    queryRunning = false;
+    btnExecuteQuery.disabled = selectedEndpoint?.provider&&!isProviderReady(selectedEndpoint.provider);
     btnExecuteQuery.innerHTML = 'Consultar agora →';
+    if(queryEndpoint.provider)checkAllApisStatus();
   }
 }
 
